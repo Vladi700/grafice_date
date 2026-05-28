@@ -20,3 +20,4 @@ jobs:
         with:
           commit_message: 'ci: rebuild dashboards from Google Sheets'
           file_pattern: '**/*_dashboard.html'
+          push_options: '--force'
