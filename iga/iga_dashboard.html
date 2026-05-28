@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="utf-8" />
+<title>IGA — Dashboard interactiv</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --text: #e2e8f0;
+    --muted: #94a3b8; --accent: #38bdf8; --border: #334155;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--text); min-height: 100vh; }
+  header { padding: 18px 28px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  main { display: grid; grid-template-columns: 320px 1fr; gap: 20px; padding: 20px 28px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px;
+          text-transform: uppercase; letter-spacing: 0.05em; }
+  select, input[type="search"] { width: 100%; padding: 8px 10px; background: #0b1220;
+    color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none; }
+  select:focus, input[type="search"]:focus { border-color: var(--accent); }
+  .city-list { max-height: 460px; overflow-y: auto; margin-top: 8px;
+    border: 1px solid var(--border); border-radius: 6px; padding: 8px; background: #0b1220; }
+  .city-item { display: flex; align-items: center; gap: 8px; padding: 4px 6px;
+    border-radius: 4px; cursor: pointer; font-size: 13px; }
+  .city-item:hover { background: #1f2937; }
+  .city-item input { accent-color: var(--accent); }
+  .actions { display: flex; gap: 8px; margin-top: 10px; }
+  .actions button { flex: 1; padding: 6px 10px; background: transparent; color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .actions button:hover { border-color: var(--accent); color: var(--accent); }
+  #plot { width: 100%; height: 72vh; min-height: 520px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+  .count { color: var(--muted); font-size: 12px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>IGA — Grafice interactive</h1>
+  <p>Alege o variabilă și una sau mai multe orașe pentru a le compara pe același grafic.</p>
+</header>
+<main>
+  <aside class="panel">
+    <label for="variable">Variabilă</label>
+    <select id="variable"></select>
+
+    <label for="filter" style="margin-top:14px;">Orașe</label>
+    <input type="search" id="filter" placeholder="Caută..." />
+    <div class="actions">
+      <button id="selectAll">Toate</button>
+      <button id="clearAll">Niciunul</button>
+    </div>
+    <div id="cityList" class="city-list"></div>
+    <div class="count" id="count"></div>
+  </aside>
+  <section>
+    <div id="plot"></div>
+  </section>
+</main>
+<script>
+const DATA = {"Indicele imobiliare.ro (eur)": {"x": ["apr. 20", "aug. 20", "dec. 20", "feb. 20", "ian. 20", "iul. 20", "iun. 20", "mai 202", "mar. 20", "nov. 20", "oct. 20", "sept. 2"], "series": {"National": [1.842, 1.886, 1.965, 1.996, 1.974, 1.829, 1.854, 1.843, 1.818, 1.948, 1.923, 1.909], "Bucuresti": [2.044, 2.102, 2.204, 2.236, 2.214, 2.053, 2.064, 2.06, 1.998, 2.178, 2.151, 2.125], "Cluj": [3.1, 3.137, 3.235, 3.272, 3.256, 3.15, 3.146, 3.125, 3.071, 3.207, 3.178, 3.152], "Iasi": [3.1, 3.137, 3.235, 3.272, 3.256, 3.15, 3.146, 3.125, 3.071, 3.207, 3.178, 3.152], "Ploiesti": [1.237, 1.306, 1.345, 1.355, 1.356, 1.288, 1.279, 1.257, 1.22, 1.333, 1.323, 1.319], "Brasov": [2.166, 2.193, 2.228, 2.265, 2.228, 2.183, 2.186, 2.18, 2.134, 2.223, 2.217, 2.209], "Constanta": [1.829, 1.891, 1.943, 1.975, 1.944, 1.877, 1.867, 1.845, 1.806, 1.93, 1.909, 1.898], "Timisoara": [1.75, 1.818, 1.865, 1.909, 1.888, 1.785, 1.77, 1.757, 1.741, 1.857, 1.849, 1.833], "Craiova": [1.89, 2.022, 2.133, 2.15, 2.142, 2.007, 1.974, 1.915, 1.871, 2.095, 2.076, 2.048], "Sibiu": [1.824, 1.877, 1.941, 1.968, 1.95, 1.857, 1.857, 1.847, 1.977, 1.927, 1.905, 1.894], "Oradea": [1.75, 1.772, 1.784, 1.809, 1.789, 1.767, 1.776, 1.759, 1.71, 1.798, 1.785, 1.8]}}, "Indicele imobiliare.ro (lei)": {"x": ["apr. 20", "aug. 20", "dec. 20", "feb. 20", "ian. 20", "iul. 20", "iun. 20", "mai 202", "mar. 20", "nov. 20", "oct. 20", "sept. 2"], "series": {"National": [9.168, 9.553, 10.004, 10.169, 10.052, 9.277, 9.357, 9.342, 9.048, 9.909, 9.783, 9.686], "Bucuresti": [10.174, 10.647, 11.221, 11.392, 11.275, 10.413, 10.417, 10.442, 9.944, 11.079, 10.943, 10.782]}}, "Salariu mediu net (lei)": {"x": ["apr. 20", "aug. 20", "dec. 20", "feb. 20", "ian. 20", "iul. 20", "iun. 20", "mai 202", "mar. 20", "nov. 20", "oct. 20", "sept. 2"], "series": {"National": [5.647, 5.387, 5.914, 5.557, 5.518, 5.517, 5.539, 5.508, 5.691, 5.615, 5.492, 5.443], "Bucuresti": [7.343, 6.822, 7.744, 7.173, 7.073, 7.016, 7.051, 6.989, 7.599, 7.113, 6.978, 6.911], "Cluj": [6.655, 6.559, 7.33, 6.542, 6.532, 6.696, 6.633, 6.74, 6.906, 6.768, 6.706, 6.567], "Iasi": [6.655, 6.559, 7.33, 6.542, 6.532, 6.696, 6.633, 6.74, 6.906, 6.768, 6.706, 6.567], "Ploiesti": [5.045, 4.938, 5.241, 4.951, 4.985, 5.049, 4.987, 5.022, 5.113, 5.084, 5.025, 4.965], "Brasov": [5.25, 5.108, 5.646, 5.258, 5.245, 5.205, 5.376, 5.214, 5.368, 5.486, 5.164, 5.138], "Constanta": [5.057, 4.863, 5.338, 4.788, 4.847, 4.86, 4.88, 4.926, 4.913, 4.957, 4.884, 4.868], "Timisoara": [6.416, 5.811, 6.464, 5.99, 5.904, 5.934, 6.192, 6.101, 6.24, 6.857, 5.95, 5.904], "Craiova": [4.883, 4.779, 5.316, 4.881, 4.826, 4.97, 4.837, 4.794, 4.894, 4.931, 4.932, 4.808], "Sibiu": [5.863, 5.345, 5.969, 5.271, 5.75, 5.554, 5.528, 5.679, 5.545, 5.794, 5.529, 5.567], "Oradea": [4.62, 4.55, 4.849, 4.64, 4.524, 4.621, 4.67, 4.736, 4.661, 4.803, 4.689, 4.622]}}, "Venit median / gospodarie": {"x": ["apr. 20", "aug. 20", "dec. 20", "feb. 20", "ian. 20", "iul. 20", "iun. 20", "mai 202", "mar. 20", "nov. 20", "oct. 20", "sept. 2"], "series": {"National": [7.488, 7.143, 7.842, 7.274, 7.223, 7.316, 7.345, 7.304, 7.546, 7.445, 7.282, 7.217], "Bucuresti": [9.737, 9.046, 10.269, 9.389, 9.259, 9.303, 9.35, 9.267, 10.076, 9.432, 9.253, 9.164], "Cluj": [8.825, 8.697, 9.72, 8.563, 8.55, 8.879, 8.795, 8.937, 9.157, 8.974, 8.892, 8.708], "Iasi": [8.825, 8.697, 9.72, 8.563, 8.55, 8.879, 8.795, 8.937, 9.157, 8.974, 8.892, 8.708], "Ploiesti": [6.69, 6.548, 6.95, 6.481, 6.525, 6.695, 6.613, 6.659, 6.78, 6.741, 6.663, 6.584], "Brasov": [6.962, 6.773, 7.487, 6.883, 6.866, 6.902, 7.129, 6.914, 7.118, 7.274, 6.847, 6.813], "Constanta": [6.706, 6.448, 7.078, 6.267, 6.345, 6.444, 6.471, 6.532, 6.515, 6.573, 6.476, 6.455], "Timisoara": [8.508, 7.705, 8.571, 7.841, 7.728, 7.868, 8.211, 8.09, 8.274, 9.092, 7.89, 7.829], "Craiova": [6.475, 6.337, 7.049, 6.389, 6.317, 6.59, 6.414, 6.357, 6.489, 6.539, 6.54, 6.375], "Sibiu": [7.774, 7.087, 7.915, 6.989, 7.527, 7.365, 7.33, 7.53, 7.353, 7.683, 7.331, 7.382], "Oradea": [6.126, 6.033, 6.43, 6.074, 5.922, 6.127, 6.192, 6.28, 6.18, 6.369, 6.218, 6.129]}}, "Pret mediu (eur)": {"x": ["apr. 20", "aug. 20", "dec. 20", "feb. 20", "ian. 20", "iul. 20", "iun. 20", "mai 202", "mar. 20", "nov. 20", "oct. 20", "sept. 2"], "series": {"National": [101.31, 103.73, 108.075, 109.78, 108.57, 100.595, 101.97, 101.365, 99.99, 107.14, 105.765, 104.995], "Bucuresti": [112.42, 115.61, 121.22, 122.98, 121.77, 112.915, 113.52, 113.3, 109.89, 119.79, 118.305, 116.875], "Cluj": [170.5, 172.535, 177.925, 179.96, 179.08, 173.25, 173.03, 171.875, 168.905, 176.385, 174.79, 173.36], "Iasi": [170.5, 172.535, 177.925, 179.96, 179.08, 173.25, 173.03, 171.875, 168.905, 176.385, 174.79, 173.36], "Ploiesti": [68.035, 71.83, 73.975, 74.525, 74.58, 70.84, 70.345, 69.135, 67.1, 73.315, 72.765, 72.545], "Brasov": [119.13, 120.615, 122.54, 124.575, 122.54, 120.065, 120.23, 119.9, 117.37, 122.265, 121.935, 121.495], "Constanta": [100.595, 104.005, 106.865, 108.625, 106.92, 103.235, 102.685, 101.475, 99.33, 106.15, 104.995, 104.39], "Timisoara": [96.25, 99.99, 102.575, 104.995, 103.84, 98.175, 97.35, 96.635, 95.755, 102.135, 101.695, 100.815], "Craiova": [103.95, 111.21, 117.315, 118.25, 117.81, 110.385, 108.57, 105.325, 102.905, 115.225, 114.18, 112.64], "Sibiu": [100.32, 103.235, 106.755, 98.175, 107.25, 102.135, 102.135, 101.585, 99.165, 105.985, 104.775, 104.17], "Oradea": [96.25, 97.46, 98.12, 99.495, 98.395, 97.185, 97.68, 96.745, 94.05, 98.89, 98.175, 99.0]}}, "Pret mediu (lei)": {"x": ["apr. 20", "aug. 20", "dec. 20", "feb. 20", "ian. 20", "iul. 20", "iun. 20", "mai 202", "mar. 20", "nov. 20", "oct. 20", "sept. 2"], "series": {"National": [504.25, 525.434, 550.231, 559.285, 552.882, 510.218, 514.622, 513.819, 497.63, 545.0, 538.058, 532.713], "Bucuresti": [559.548, 585.611, 617.155, 626.534, 620.102, 572.705, 572.913, 574.318, 546.901, 609.348, 601.853, 592.989], "Cluj": [848.63, 873.959, 905.852, 916.428, 911.947, 878.724, 873.248, 871.234, 840.606, 897.235, 889.209, 879.577], "Iasi": [848.63, 873.959, 905.852, 916.428, 911.947, 878.724, 873.248, 871.234, 840.606, 897.235, 889.209, 879.577], "Ploiesti": [338.631, 363.848, 376.622, 379.675, 379.791, 359.3, 355.017, 350.445, 333.943, 372.939, 370.177, 368.072], "Brasov": [592.946, 610.963, 623.876, 634.66, 624.023, 608.97, 606.777, 607.773, 584.127, 621.938, 620.32, 616.429], "Constanta": [500.691, 526.827, 544.071, 553.401, 544.479, 523.608, 518.231, 514.377, 494.346, 539.964, 534.141, 529.644], "Timisoara": [479.065, 506.489, 522.23, 534.908, 528.795, 497.944, 491.306, 489.843, 476.553, 519.54, 517.353, 511.505], "Craiova": [517.39, 563.323, 597.274, 602.436, 599.936, 559.873, 547.931, 533.892, 512.138, 586.127, 580.868, 571.502], "Sibiu": [499.323, 522.927, 543.511, 488.617, 546.16, 518.029, 515.455, 514.934, 493.524, 539.124, 533.022, 528.527], "Oradea": [479.065, 493.674, 499.549, 506.887, 501.067, 492.922, 492.971, 490.4, 468.068, 503.034, 499.446, 502.296]}}, "Venit eligibil": {"x": ["apr. 20", "aug. 20", "dec. 20", "feb. 20", "ian. 20", "iul. 20", "iun. 20", "mai 202", "mar. 20", "nov. 20", "oct. 20", "sept. 2"], "series": {"National": [2.995, 2.857, 3.137, 2.91, 2.889, 2.926, 2.938, 2.921, 3.019, 2.978, 2.913, 2.887], "Bucuresti": [3.895, 3.618, 4.107, 3.756, 3.703, 3.721, 3.74, 3.707, 4.031, 3.773, 3.701, 3.666], "Cluj": [3.53, 3.479, 3.888, 3.425, 3.42, 3.552, 3.518, 3.575, 3.663, 3.59, 3.557, 3.483], "Iasi": [3.53, 3.479, 3.888, 3.425, 3.42, 3.552, 3.518, 3.575, 3.663, 3.59, 3.557, 3.483], "Ploiesti": [2.676, 2.619, 2.78, 2.592, 2.61, 2.678, 2.645, 2.664, 2.712, 2.697, 2.665, 2.633], "Brasov": [2.785, 2.709, 2.995, 2.753, 2.746, 2.761, 2.851, 2.766, 2.847, 2.91, 2.739, 2.725], "Constanta": [2.682, 2.579, 2.831, 2.507, 2.538, 2.578, 2.588, 2.613, 2.606, 2.629, 2.59, 2.582], "Timisoara": [3.403, 3.082, 3.429, 3.136, 3.091, 3.147, 3.284, 3.236, 3.31, 3.637, 3.156, 3.131], "Craiova": [2.59, 2.535, 2.82, 2.556, 2.527, 2.636, 2.566, 2.543, 2.596, 2.615, 2.616, 2.55], "Sibiu": [3.11, 2.835, 3.166, 2.796, 3.011, 2.946, 2.932, 3.012, 2.941, 3.073, 2.933, 2.953], "Oradea": [2.45, 2.413, 2.572, 2.43, 2.369, 2.451, 2.477, 2.512, 2.472, 2.548, 2.487, 2.452]}}, "Suma imprumutata": {"x": ["apr. 20", "aug. 20", "dec. 20", "feb. 20", "ian. 20", "iul. 20", "iun. 20", "mai 202", "mar. 20", "nov. 20", "oct. 20", "sept. 2"], "series": {"National": [428.613, 446.619, 467.697, 475.392, 469.95, 433.685, 437.429, 436.746, 422.986, 463.25, 457.35, 452.806], "Bucuresti": [475.616, 497.769, 524.582, 532.554, 527.086, 486.799, 486.976, 488.17, 464.865, 517.946, 511.575, 504.04], "Cluj": [721.335, 742.865, 769.974, 778.964, 775.155, 746.915, 742.261, 740.549, 714.515, 762.65, 755.828, 747.64], "Iasi": [721.335, 742.865, 769.974, 778.964, 775.155, 746.915, 742.261, 740.549, 714.515, 762.65, 755.828, 747.64], "Ploiesti": [287.836, 309.271, 320.128, 322.724, 322.823, 305.405, 301.765, 297.879, 283.852, 316.998, 314.651, 312.861], "Brasov": [504.004, 519.319, 530.294, 539.461, 530.419, 517.624, 515.76, 516.607, 496.508, 528.647, 527.272, 523.965], "Constanta": [425.588, 447.803, 462.46, 470.391, 462.807, 445.067, 440.496, 437.22, 420.194, 458.969, 454.02, 450.197], "Timisoara": [407.205, 430.516, 443.895, 454.671, 449.476, 423.252, 417.61, 416.366, 405.07, 441.609, 439.75, 434.779], "Craiova": [439.782, 478.825, 507.683, 512.071, 509.945, 475.892, 465.741, 453.809, 435.317, 498.208, 493.738, 485.776], "Sibiu": [424.424, 444.488, 461.984, 415.324, 464.236, 440.324, 438.137, 437.694, 419.496, 458.256, 453.069, 449.248], "Oradea": [407.205, 419.623, 424.616, 430.854, 425.907, 418.984, 419.026, 416.84, 397.858, 427.579, 424.529, 426.952]}}, "Rata lunara (lei)": {"x": ["apr. 20", "aug. 20", "dec. 20", "feb. 20", "ian. 20", "iul. 20", "iun. 20", "mai 202", "mar. 20", "nov. 20", "oct. 20", "sept. 2"], "series": {"National": [3.195, 3.315, 3.45, 3.55, 3.571, 3.188, 3.255, 3.242, 3.184, 3.478, 3.434, 3.376], "Bucuresti": [3.861, 4.025, 4.22, 4.329, 4.35, 3.904, 3.947, 3.948, 3.805, 4.23, 4.178, 4.091], "Cluj": [5.378, 5.514, 5.68, 5.817, 5.891, 5.491, 5.524, 5.497, 5.378, 5.726, 5.674, 5.574], "Iasi": [5.378, 5.514, 5.68, 5.817, 5.891, 5.491, 5.524, 5.497, 5.378, 5.726, 5.674, 5.574], "Ploiesti": [2.146, 2.296, 2.362, 2.41, 2.453, 2.245, 2.246, 2.211, 2.137, 2.38, 2.362, 2.332], "Brasov": [3.757, 3.855, 3.912, 4.029, 4.031, 3.805, 3.838, 3.834, 3.737, 3.969, 3.958, 3.906], "Constanta": [3.173, 3.324, 3.412, 3.513, 3.517, 3.272, 3.278, 3.245, 3.163, 3.446, 3.409, 3.356], "Timisoara": [3.036, 3.195, 3.275, 3.396, 3.416, 3.111, 3.108, 3.09, 3.049, 3.315, 3.301, 3.241], "Craiova": [3.279, 3.554, 3.745, 3.824, 3.875, 3.498, 3.466, 3.368, 3.277, 3.74, 3.707, 3.622], "Sibiu": [3.164, 3.299, 3.408, 3.151, 3.528, 3.237, 3.261, 3.249, 3.158, 3.44, 3.401, 3.349], "Oradea": [3.036, 3.115, 3.132, 3.218, 3.237, 3.08, 3.118, 3.094, 2.995, 3.21, 3.187, 3.183]}}};
+const variableSelect = document.getElementById('variable');
+const cityList = document.getElementById('cityList');
+const filterInput = document.getElementById('filter');
+const countEl = document.getElementById('count');
+
+Object.keys(DATA).sort().forEach(name => {
+  const opt = document.createElement('option');
+  opt.value = name; opt.textContent = name;
+  variableSelect.appendChild(opt);
+});
+
+let currentVar = variableSelect.value;
+let selected = new Set();
+
+const PALETTE = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf','#38bdf8','#f472b6','#a3e635','#fb7185','#fbbf24'];
+function colorOf(name) {
+  const cities = Object.keys(DATA[currentVar].series).sort();
+  return PALETTE[cities.indexOf(name) % PALETTE.length];
+}
+
+function renderCityList() {
+  const cities = Object.keys(DATA[currentVar].series).sort();
+  const q = filterInput.value.trim().toLowerCase();
+  cityList.innerHTML = '';
+  cities.filter(n => !q || n.toLowerCase().includes(q)).forEach(name => {
+    const wrap = document.createElement('label');
+    wrap.className = 'city-item';
+    const color = colorOf(name);
+    wrap.innerHTML = `<input type="checkbox" style="accent-color:${color}" ${selected.has(name) ? 'checked' : ''} data-name="${name.replace(/"/g,'&quot;')}"/> <span style="color:${color}">${name}</span>`;
+    cityList.appendChild(wrap);
+  });
+  cityList.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const n = cb.getAttribute('data-name');
+      if (cb.checked) selected.add(n); else selected.delete(n);
+      drawPlot(); updateCount();
+    });
+  });
+  updateCount();
+}
+
+function updateCount() {
+  const total = Object.keys(DATA[currentVar].series).length;
+  countEl.textContent = `${selected.size} / ${total} selectate`;
+}
+
+function drawPlot() {
+  const v = DATA[currentVar];
+  const traces = [...selected].map(name => {
+    const c = colorOf(name);
+    return {
+      x: v.x, y: v.series[name],
+      mode: 'lines+markers', name: name, connectgaps: false,
+      line: { color: c }, marker: { color: c },
+    };
+  });
+  const layout = {
+    title: { text: currentVar, font: { color: '#e2e8f0' } },
+    paper_bgcolor: '#1e293b', plot_bgcolor: '#0b1220',
+    font: { color: '#e2e8f0' },
+    margin: { l: 60, r: 20, t: 50, b: 60 },
+    xaxis: { gridcolor: '#334155', title: 'Luna' },
+    yaxis: { gridcolor: '#334155', title: currentVar },
+    showlegend: false,
+    hovermode: 'x unified',
+  };
+  Plotly.react('plot', traces, layout, { responsive: true, displayModeBar: false, scrollZoom: true });
+}
+
+function onVariableChange() {
+  currentVar = variableSelect.value;
+  // default: no cities selected
+  selected = new Set();
+  filterInput.value = '';
+  renderCityList(); drawPlot();
+}
+
+variableSelect.addEventListener('change', onVariableChange);
+filterInput.addEventListener('input', renderCityList);
+document.getElementById('selectAll').addEventListener('click', () => {
+  Object.keys(DATA[currentVar].series).forEach(n => selected.add(n));
+  renderCityList(); drawPlot();
+});
+document.getElementById('clearAll').addEventListener('click', () => {
+  selected.clear(); renderCityList(); drawPlot();
+});
+
+onVariableChange();
+</script>
+</body>
+</html>
