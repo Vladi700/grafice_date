@@ -114,7 +114,7 @@ function drawPlot() {
     const c = colorOf(name);
     return {
       x: v.x, y: v.series[name],
-      mode: 'lines+markers', name: name, connectgaps: false,
+      mode: 'lines+markers', name: name, connectgaps: true,
       line: { color: c }, marker: { color: c },
     };
   });
