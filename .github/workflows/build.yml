@@ -11,15 +11,18 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
       - run: python build_all.py
-      - name: Pull with rebase
-        run: git pull --rebase --autostash origin main || true
-      - uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: 'ci: rebuild dashboards from Google Sheets'
-          file_pattern: '**/*_dashboard.html'
-          push_options: '--force'
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add **/*_dashboard.html
+          git diff --staged --quiet || git commit -m "ci: rebuild dashboards from Google Sheets"
+          git pull --rebase --autostash origin main || true
+          git push --force
