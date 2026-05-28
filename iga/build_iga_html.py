@@ -51,7 +51,29 @@ SKIP_VARIABLES = {
     "Numar luni credit",
 }
 
+# Romanian month name to number mapping
+RO_MONTHS = {
+    "ian": "01", "feb": "02", "mar": "03", "apr": "04",
+    "mai": "05", "iun": "06", "iul": "07", "aug": "08",
+    "sep": "09", "oct": "10", "nov": "11", "dec": "12",
+}
+
 from _sheets import read_sheet
+
+
+def parse_ro_date(date_str: str) -> str:
+    """Convert Romanian date like 'ian. 2020' to '2020-01'."""
+    if pd.isna(date_str):
+        return None
+    s = str(date_str).strip().lower()
+    # Format: "ian. 2020" or "ian 2020"
+    parts = s.replace(".", "").split()
+    if len(parts) >= 2:
+        month_abbr = parts[0][:3]
+        year = parts[1]
+        if month_abbr in RO_MONTHS:
+            return f"{year}-{RO_MONTHS[month_abbr]}"
+    return None
 
 
 def main():
@@ -64,11 +86,11 @@ def main():
         if df.shape[1] < 2 or df.shape[0] == 0:
             continue
         date_col = df.columns[0]  # 'Luna'
-        # normalize dates
+        # normalize dates - handle Romanian month names
         if pd.api.types.is_datetime64_any_dtype(df[date_col]):
             dates = df[date_col].dt.strftime("%Y-%m").tolist()
         else:
-            dates = [str(v)[:7] for v in df[date_col].tolist()]
+            dates = [parse_ro_date(v) for v in df[date_col].tolist()]
 
         for col in df.columns[1:]:
             var_name = str(col).strip()
@@ -103,10 +125,11 @@ def main():
         if df.shape[1] < 2 or df.shape[0] == 0:
             continue
         date_col = df.columns[0]
+        # normalize dates - handle Romanian month names
         if pd.api.types.is_datetime64_any_dtype(df[date_col]):
             dates = df[date_col].dt.strftime("%Y-%m").tolist()
         else:
-            dates = [str(v)[:7] for v in df[date_col].tolist()]
+            dates = [parse_ro_date(v) for v in df[date_col].tolist()]
 
         for col in df.columns[1:]:
             city = str(col).strip()
